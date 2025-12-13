@@ -40,7 +40,7 @@ WORKDIR /workspace
 # --------------------------------------------------------------
 #   Pico SDK
 # --------------------------------------------------------------
-ENV PICO_SDK_VERSION=v2.0.0
+ENV PICO_SDK_VERSION=2.0.0
 RUN git clone --depth 1 -b $PICO_SDK_VERSION \
         https://github.com/raspberrypi/pico-sdk.git && \
     cd pico-sdk && git submodule update --init
