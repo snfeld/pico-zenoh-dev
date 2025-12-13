@@ -50,7 +50,7 @@ ENV PICO_SDK_PATH=/workspace/pico-sdk
 # --------------------------------------------------------------
 #   Zenoh‑pico (C API)
 # --------------------------------------------------------------
-ENV ZENOH_PICO_VERSION=v0.9.0
+ENV ZENOH_PICO_VERSION=0.11.0.3
 RUN git clone --depth 1 -b $ZENOH_PICO_VERSION \
         https://github.com/eclipse-zenoh/zenoh-pico.git && \
     cd zenoh-pico && \
