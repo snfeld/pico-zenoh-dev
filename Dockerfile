@@ -22,6 +22,9 @@ RUN apt-get update && \
         binutils-arm-none-eabi \
         libnewlib-arm-none-eabi \
         libstdc++-arm-none-eabi-newlib \
+        picotool \
+        pkg-config \
+        ca-certificates \
         && rm -rf /var/lib/apt/lists/*
 
 # --------------------------------------------------------------
@@ -57,18 +60,15 @@ RUN git clone --depth 1 -b $ZENOH_PICO_VERSION \
     # Zenoh‑pico stellt ein CMake‑Projekt bereit, das wir später einbinden
     true
 
+
 # --------------------------------------------------------------
-#   pico‑prog (Upload‑Tool)
+#   Udev‑Regel für das USB‑Device (optional – erleichtert picotool)
 # --------------------------------------------------------------
-RUN wget -qO- https://github.com/raspberrypi/pico-tools/releases/latest/download/pico-tools-linux.zip \
-        | bsdtar -xf- -C /usr/local/bin && \
-    chmod +x /usr/local/bin/pico* && \
-    # sysfs‑Zugriff für das USB‑Device (nur für das Flash‑Tool nötig)
-    echo "SUBSYSTEM==\"usb\", ATTR{idVendor}==\"2e8a\", MODE=\"0666\", GROUP=\"plugdev\"" \
+RUN echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="2e8a", MODE="0666", GROUP="plugdev"' \
         > /etc/udev/rules.d/99-pico.rules && \
     udevadm control --reload-rules && \
     udevadm trigger
-
+    
 # --------------------------------------------------------------
 #   CMake‑Toolchain‑File für RP2040
 # --------------------------------------------------------------
