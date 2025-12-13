@@ -1,0 +1,85 @@
+# ----------------------------------------------------------------------
+# .github/workflows/docker-build.yml
+# ----------------------------------------------------------------------
+name: Build & Publish Docker image (pico‑zenoh‑dev)
+
+on:
+  push:
+    branches:
+      - main                     # bei jedem Push auf main
+    paths:
+      - Dockerfile               # nur ausführen, wenn das Dockerfile geändert wurde
+      - '**/CMakeLists.txt'     # oder Build‑Skripte ändern
+  pull_request:
+    branches:
+      - main                     # bei PRs gegen main ebenfalls bauen
+    paths:
+      - Dockerfile
+      - '**/CMakeLists.txt'
+
+jobs:
+  # --------------------------------------------------------------
+  # Job: build‑and‑push
+  # --------------------------------------------------------------
+  build-and-push:
+    name: Build Docker image & push to GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read            # zum Checkout des Codes
+      packages: write           # zum Pushen des Images
+      id-token: write          # für OIDC‑Login (falls ghcr.io via OIDC)
+
+    steps:
+      # ----------------------------------------------------------
+      # 1️⃣ Checkout des Repositories
+      # ----------------------------------------------------------
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0               # komplette Historie (für Tag‑Besp. optional)
+
+      # ----------------------------------------------------------
+      # 2️⃣ Set‑up Docker Buildx (multi‑arch, cache)
+      # ----------------------------------------------------------
+      - name: 🛠️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ----------------------------------------------------------
+      # 3️⃣ (Optional) Log‑in zu GitHub Container Registry
+      #    – two‑step auth:   ghcr.io  <--  GITHUB_TOKEN (automatisch)
+      # ----------------------------------------------------------
+      - name: 🔐 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----------------------------------------------------------
+      # 4️⃣ Build & push the image
+      # ----------------------------------------------------------
+      - name: 🏗️ Build and push Docker image
+        id: docker_build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true                     # true ⇒ push nach Build
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/pico-zenoh-dev:latest
+            ghcr.io/${{ github.repository_owner }}/pico-zenoh-dev:${{ github.sha }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/pico-zenoh-dev:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/pico-zenoh-dev:buildcache,mode=max
+
+      # ----------------------------------------------------------
+      # 5️⃣ (Optional) Ausgabe des Image‑Digest
+      # ----------------------------------------------------------
+      - name: 📦 Show built image digest
+        run: echo "Image digest = ${{ steps.docker_build.outputs.digest }}"
+
+      # ----------------------------------------------------------
+      # 6️⃣ (Optional) Delete old images / keep‑policy
+      # ----------------------------------------------------------
+      # Hinweis: GitHub behält standardmäßig 100 Images/Tags, wenn du
+      #         eine Aufräum‑Policy brauchst, kannst du das `gh`‑CLI
+      #         benutzen oder ein separates Action‑Step hinzufügen.
