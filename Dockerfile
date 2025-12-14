@@ -41,28 +41,10 @@ RUN git clone https://github.com/raspberrypi/pico-sdk.git ${PICO_SDK_PATH} && \
     cd ${PICO_SDK_PATH} && \
     git submodule update --init
 
-# Zenoh-pico installieren
+# Zenoh-pico klonen (ohne sofort zu bauen)
 RUN git clone https://github.com/eclipse-zenoh/zenoh-pico.git ${ZENOH_PICO_PATH} && \
     cd ${ZENOH_PICO_PATH} && \
     git submodule update --init --recursive
-
-# Zenoh-pico für Pico kompilieren
-RUN cd ${ZENOH_PICO_PATH} && \
-    mkdir -p build && \
-    cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=${PICO_SDK_PATH}/cmake/preload/toolchains/pico_arm_gcc.cmake \
-          -DZENOHC_BUILD_WITH_UNSTABLE_API=ON \
-          -DZENOHC_BUILD_WITH_SHARED_MEMORY=ON \
-          -DZENOHC_BUILD_WITH_MULTICAST=ON \
-          -DZENOHC_BUILD_WITH_LINGER=ON \
-          -DZENOHC_BUILD_WITH_UNIX_SOCKET=OFF \
-          -DZENOHC_BUILD_WITH_TCP=ON \
-          -DZENOHC_BUILD_WITH_UDP=ON \
-          -DZENOHC_BUILD_WITH_BLUETOOTH=OFF \
-          -DZENOHC_BUILD_WITH_SERIAL=ON \
-          -DZENOHC_BUILD_EXAMPLES=ON && \
-    make -j$(nproc)
 
 # Pico-Tools installieren
 RUN git clone https://github.com/raspberrypi/picotool.git /opt/picotool && \
