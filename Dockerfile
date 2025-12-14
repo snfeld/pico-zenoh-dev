@@ -1,82 +1,101 @@
-# ----------------------------------------------------------------------
-#   Dockerfile – Build‑Umgebung für Raspberry Pi Pico + Zenoh‑pico
-# ----------------------------------------------------------------------
 FROM ubuntu:22.04
 
-# --------------------------------------------------------------
-#   System‑Pakete (apt)
-# --------------------------------------------------------------
-ARG DEBIAN_FRONTEND=noninteractive
+# Umgebungsvariablen
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PICO_SDK_PATH=/opt/pico-sdk
+ENV ZENOH_PICO_PATH=/opt/zenoh-pico
+
+# System-Updates und grundlegende Abhängigkeiten installieren
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y \
+    build-essential \
+    cmake \
+    gcc-arm-none-eabi \
+    libnewlib-arm-none-eabi \
+    libstdc++-arm-none-eabi-newlib \
+    git \
+    wget \
+    curl \
+    python3 \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
+    pkg-config \
+    libusb-1.0-0-dev \
+    libffi-dev \
+    libssl-dev \
+    clang \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python-Abhängigkeiten installieren
+RUN pip3 install \
+    pyserial \
+    cmake \
+    pycryptodome \
+    tqdm
+
+# Raspberry Pi Pico SDK installieren
+RUN git clone https://github.com/raspberrypi/pico-sdk.git ${PICO_SDK_PATH} && \
+    cd ${PICO_SDK_PATH} && \
+    git submodule update --init
+
+# Zenoh-pico installieren
+RUN git clone https://github.com/eclipse-zenoh/zenoh-pico.git ${ZENOH_PICO_PATH} && \
+    cd ${ZENOH_PICO_PATH} && \
+    git submodule update --init --recursive
+
+# Zenoh-pico für Pico kompilieren
+RUN cd ${ZENOH_PICO_PATH} && \
+    mkdir -p build && \
+    cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=${PICO_SDK_PATH}/cmake/preload/toolchains/pico_arm_gcc.cmake \
+          -DZENOHC_BUILD_WITH_UNSTABLE_API=ON \
+          -DZENOHC_BUILD_WITH_SHARED_MEMORY=ON \
+          -DZENOHC_BUILD_WITH_MULTICAST=ON \
+          -DZENOHC_BUILD_WITH_LINGER=ON \
+          -DZENOHC_BUILD_WITH_UNIX_SOCKET=OFF \
+          -DZENOHC_BUILD_WITH_TCP=ON \
+          -DZENOHC_BUILD_WITH_UDP=ON \
+          -DZENOHC_BUILD_WITH_BLUETOOTH=OFF \
+          -DZENOHC_BUILD_WITH_SERIAL=ON \
+          -DZENOHC_BUILD_EXAMPLES=ON && \
+    make -j$(nproc)
+
+# Pico-Tools installieren
+RUN git clone https://github.com/raspberrypi/picotool.git /opt/picotool && \
+    cd /opt/picotool && \
+    mkdir build && \
+    cd build && \
+    cmake .. -DPICO_SDK_PATH=${PICO_SDK_PATH} && \
+    make -j$(nproc) && \
+    cp picotool /usr/local/bin/
+
+# OpenOCD für Debugging installieren (optional)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        cmake \
-        ninja-build \
-        git \
-        wget \
-        unzip \
-        python3 \
-        python3-pip \
-        libusb-1.0-0-dev \
-        gcc-arm-none-eabi \
-        binutils-arm-none-eabi \
-        libnewlib-arm-none-eabi \
-        libstdc++-arm-none-eabi-newlib \
-        picotool \
-        pkg-config \
-        ca-certificates \
-        && rm -rf /var/lib/apt/lists/*
+    apt-get install -y \
+    automake \
+    autoconf \
+    libtool \
+    libusb-1.0-0-dev \
+    libhidapi-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# --------------------------------------------------------------
-#   Benutzer & Arbeitsverzeichnis
-# --------------------------------------------------------------
-ARG USERNAME=picobuild
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
+RUN git clone https://github.com/raspberrypi/openocd.git /opt/openocd && \
+    cd /opt/openocd && \
+    ./bootstrap && \
+    ./configure --enable-ftdi --enable-sysfsgpio --enable-bcm2835gpio && \
+    make -j$(nproc) && \
+    make install
 
-RUN groupadd --gid $USER_GID $USERNAME && \
-    useradd --uid $USER_UID --gid $USER_GID -m $USERNAME && \
-    mkdir -p /workspace && chown $USERNAME:$USERNAME /workspace
-
+# Arbeitsverzeichnis erstellen
 WORKDIR /workspace
 
-# --------------------------------------------------------------
-#   Pico SDK
-# --------------------------------------------------------------
-ENV PICO_SDK_VERSION=2.0.0
-RUN git clone --depth 1 -b $PICO_SDK_VERSION \
-        https://github.com/raspberrypi/pico-sdk.git && \
-    cd pico-sdk && git submodule update --init
+# Umgebungsvariablen für die Shell exportieren
+RUN echo 'export PICO_SDK_PATH=/opt/pico-sdk' >> /etc/bash.bashrc && \
+    echo 'export ZENOH_PICO_PATH=/opt/zenoh-pico' >> /etc/bash.bashrc && \
+    echo 'export PATH=/usr/local/bin:$PATH' >> /etc/bash.bashrc
 
-ENV PICO_SDK_PATH=/workspace/pico-sdk
-
-# --------------------------------------------------------------
-#   Zenoh‑pico (C API)
-# --------------------------------------------------------------
-ENV ZENOH_PICO_VERSION=0.11.0.3
-RUN git clone --depth 1 -b $ZENOH_PICO_VERSION \
-        https://github.com/eclipse-zenoh/zenoh-pico.git && \
-    cd zenoh-pico && \
-    # Zenoh‑pico stellt ein CMake‑Projekt bereit, das wir später einbinden
-    true
-
-
-# --------------------------------------------------------------
-#   Udev‑Regel für das USB‑Device (optional – erleichtert picotool)
-# --------------------------------------------------------------
-RUN echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="2e8a", MODE="0666", GROUP="plugdev"' \
-        > /etc/udev/rules.d/99-pico.rules && \
-    udevadm control --reload-rules && \
-    udevadm trigger
-    
-# --------------------------------------------------------------
-#   CMake‑Toolchain‑File für RP2040
-# --------------------------------------------------------------
-ENV PICO_TOOLCHAIN_FILE=$PICO_SDK_PATH/external/pico_sdk_import.cmake
-
-# --------------------------------------------------------------
-#   Entrypoint (optional)
-# --------------------------------------------------------------
-# Der Container wird im interaktiven Modus gestartet, daher kein
-# festes ENTRYPOINT nötig – wir benutzen einfach `bash`.
-CMD ["bash"]
+# Standardbefehl
+CMD ["/bin/bash"]
