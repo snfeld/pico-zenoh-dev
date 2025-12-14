@@ -26,6 +26,7 @@ RUN apt-get update && apt-get upgrade -y && \
     libssl-dev \
     clang \
     ninja-build \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
 # Python-Abhängigkeiten installieren
