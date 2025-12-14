@@ -55,23 +55,6 @@ RUN git clone https://github.com/raspberrypi/picotool.git /opt/picotool && \
     make -j$(nproc) && \
     cp picotool /usr/local/bin/
 
-# OpenOCD für Debugging installieren (optional)
-RUN apt-get update && \
-    apt-get install -y \
-    automake \
-    autoconf \
-    libtool \
-    libusb-1.0-0-dev \
-    libhidapi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN git clone https://github.com/raspberrypi/openocd.git /opt/openocd && \
-    cd /opt/openocd && \
-    ./bootstrap && \
-    ./configure --enable-ftdi --enable-sysfsgpio --enable-bcm2835gpio && \
-    make -j$(nproc) && \
-    make install
-
 # Arbeitsverzeichnis erstellen
 WORKDIR /workspace
 
