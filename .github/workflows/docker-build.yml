@@ -78,9 +78,3 @@ jobs:
       - name: 📦 Show built image digest
         run: echo "Image digest = ${{ steps.docker_build.outputs.digest }}"
 
-      # ----------------------------------------------------------
-      # 6️⃣ (Optional) Delete old images / keep‑policy
-      # ----------------------------------------------------------
-      # Hinweis: GitHub behält standardmäßig 100 Images/Tags, wenn du
-      #         eine Aufräum‑Policy brauchst, kannst du das `gh`‑CLI
-      #         benutzen oder ein separates Action‑Step hinzufügen.
